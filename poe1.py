@@ -6,25 +6,36 @@ import os
 from datetime import datetime
 
 
+db_path = "" 
+
+
 def seleccionar_ubicacion():
+    """
+    Permite al usuario seleccionar una ubicación para guardar la base de datos.
+    """
     global db_path, conn, cursor
     db_directory = filedialog.askdirectory(title="Selecciona la ubicación para guardar la base de datos")
-    if not db_directory:
-        messagebox.showwarning("Advertencia", "No se seleccionó ninguna ubicación. Se usará la carpeta actual.")
-        db_directory = os.getcwd()  # Carpeta actual como predeterminada
-    
-    db_path = os.path.join(db_directory, "tasks.db")
+    if not db_directory:  
+        messagebox.showwarning("Advertencia!!", "no se seleccionó ninguna ubicación. Se usará la carpeta actual.")
+        db_directory = os.getcwd()  
 
-    # Conectar a la base de datos y crear el archivo si no existe
+    db_path = os.path.join(db_directory, "tasks.db")
+    conectar_db()  # Conectar o crear la base de datos
+
+
+def conectar_db():
+
+    global conn, cursor
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         print(f"Conexión a la base de datos SQLite establecida con éxito en {db_path}.")
     except sqlite3.Error as e:
         print(f"Error al conectar con la base de datos: {e}")
+        return
 
     # Crear tabla de tareas si no existe
-    cursor.execute("""
+    cursor.execute(""" 
     CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -36,13 +47,31 @@ def seleccionar_ubicacion():
     """)
     conn.commit()
 
-# Llamar a la función para seleccionar la ubicación al inicio del programa
-seleccionar_ubicacion()
+
+
+default_directory = os.getcwd()  
+db_path = os.path.join(default_directory, "tasks.db")
+
+if os.path.exists(db_path):
+    print(f"Base de datos encontrada en {db_path}. Conectando...")
+    conectar_db()  
+else:
+    print("No se encontró una base de datos existente. Solicita al usuario seleccionar una ubicación.")
+    seleccionar_ubicacion()
+    # Asegurarse de que la fecha esté en el formato correcto
+
+
+def obtener_hora_seleccionada():
+            hora_seleccionada = f"{hour_var.get()}:{minute_var.get()} {am_pm_var.get()}"
+            print(f"Hora seleccionada: {hora_seleccionada}")
+            return hora_seleccionada
+
 def agregar_tarea():
+
     title = title_entry.get()
     description = desc_entry.get("1.0", tk.END)
     due_date = cal.get_date()
-    due_time = time_entry.get()  # Obtener la hora de vencimiento
+    due_time = obtener_hora_seleccionada
     category = category_var.get()
     priority = priority_var.get()
 
@@ -50,15 +79,13 @@ def agregar_tarea():
         messagebox.showwarning("Advertencia", "El título y la hora no pueden estar vacíos.")
         return
 
-    # Validar formato de hora
-    try:
-        datetime.strptime(due_time, "%H:%M")  # Verificar que la hora esté en el formato correcto
-    except ValueError:
-        messagebox.showwarning("Advertencia", "El formato de la hora debe ser HH:MM.")
-        return
+    hora = hour_var.get()
+    minuto = minute_var.get()
+    formato = am_pm_var.get()
+
 
     # Combinar fecha y hora
-    due_datetime = f"{due_date} {due_time}:00"  # Agregar los segundos por defecto
+    due_datetime = f"{due_date} {hora}:{minuto}:00 {formato}"  
 
     # Insertar tarea en la base de datos
     cursor.execute("INSERT INTO tasks (title, description, due_date, category, priority) VALUES (?, ?, ?, ?, ?) ",
@@ -69,8 +96,7 @@ def agregar_tarea():
 
     # Limpiar campos de entrada
     title_entry.delete(0, tk.END)
-    desc_entry.delete("1.0", tk.END)
-    time_entry.delete(0, tk.END)  # Limpiar el campo de hora
+    desc_entry.delete("1.0", tk.END) 
 
     # Última tarea agregada
     ultima_tarea = task_tree.get_children()[-1]
@@ -91,7 +117,7 @@ def calculo_de_fechas(due_datetime_str):
 
     # Si el tiempo restante es negativo, significa que ya está vencido
     if remaining_time.total_seconds() < 0:
-        return "Vencido"
+        return remaining_time
     else:
         # De lo contrario, mostramos el tiempo restante
         days = remaining_time.days
@@ -232,6 +258,9 @@ def eliminar_tarea():
             conn.commit()
 
             Recargar_tareas()
+
+
+
 def editar_tarea():
     selected_item = task_tree.selection()
     if not selected_item:
@@ -257,25 +286,27 @@ def editar_tarea():
     desc_entry_edit.grid(row=1, column=1, padx=10, pady=10)
     desc_entry_edit.insert("1.0", description)
 
-    # Fecha de vencimiento
-    tk.Label(edit_window, text="Fecha de vencimiento:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
-    cal_edit = Calendar(edit_window, selectmode="day", date_pattern="yyyy-mm-dd")
-    cal_edit.grid(row=2, column=1, padx=10, pady=10)
+    hour_var = tk.StringVar(value="12")
+    hour_spinbox = tk.Spinbox(edit_window, from_=1, to=12, wrap=True, textvariable=hour_var, width=5, state="readonly")
+    hour_spinbox.grid(row=2, column=2, padx=10, pady=10, sticky="w")
+    # Spinbox para los minutos (00-59)
+    minute_var = tk.StringVar(value="00")
+    minute_spinbox = tk.Spinbox(edit_window, from_=0, to=59, wrap=True, textvariable=minute_var, width=5, state="readonly", format="%02.0f")
+    minute_spinbox.grid(row=2, column=3, pady=12, padx=12, sticky="w")
 
-    # Hora de vencimiento
-    tk.Label(edit_window, text="Hora de vencimiento:").grid(row=3, column=0, padx=10, pady=10, sticky="w")
-    hour_var = tk.StringVar(edit_window)
-    hour_var.set("12:00")  # Valor por defecto
+    # Spinbox para AM/PM
+    am_pm_var = tk.StringVar(value="AM")
+    am_pm_spinbox = tk.Spinbox(edit_window, values=("AM", "PM"), wrap=True, textvariable=am_pm_var, width=5, state="readonly")
+    am_pm_spinbox.grid(row=2, column=4, pady=14, padx=14, sticky="w")
 
-    hour_menu = ttk.Combobox(edit_window, textvariable=hour_var, values=["{:02d}:00".format(i) for i in range(24)], state="readonly")
-    hour_menu.grid(row=3, column=1, padx=10, pady=10)
+    
 
     # Si la tarea ya tiene una fecha y hora, establecerlos en el calendario y selector de hora
     if due_date:
         try:
             due_datetime = datetime.strptime(due_date, "%Y-%m-%d %H:%M:%S")
-            cal_edit.selection_set(due_datetime.date())  # Establecer solo la fecha
-            hour_var.set(due_datetime.strftime("%H:%M"))  # Establecer la hora
+            cal.selection_set(due_datetime.date())  # Establecer solo la fecha
+            obtener_hora_seleccionada.set(due_datetime.strftime("%H:%M"))  # Establecer la hora
         except ValueError:
             pass
 
@@ -292,17 +323,19 @@ def editar_tarea():
     priority_menu_edit = ttk.Combobox(edit_window, textvariable=priority_var_edit, values=["Alta", "Media", "Baja"], state="readonly")
     priority_menu_edit.grid(row=5, column=1, padx=10, pady=10)
 
+    
+    #
     # Función para guardar los cambios
     def guardar_datos():
         new_title = title_entry_edit.get()
         new_description = desc_entry_edit.get("1.0", tk.END).strip()
-        new_due_date = cal_edit.get_date()  # Fecha seleccionada
-        new_due_time = hour_var.get()  # Hora seleccionada
+        new_due_date = cal.get_date()  
+
         new_category = category_var_edit.get()
         new_priority = priority_var_edit.get()
 
         # Combinar la fecha y la hora
-        new_due_datetime_str = f"{new_due_date} {new_due_time}:00"
+        new_due_datetime_str = f"{new_due_date} {hour_var:minute_var}:00, {am_pm_var}"
         try:
             new_due_datetime = datetime.strptime(new_due_datetime_str, "%Y-%m-%d %H:%M:%S")
         except ValueError:
@@ -327,25 +360,6 @@ def editar_tarea():
     save_button.grid(row=6, column=0, columnspan=2, pady=10)  # Usar grid en lugar de pack para asegurar posición
 
     edit_window.mainloop()
-    # Crear el botón de guardar cambios
-    save_button = tk.Button(edit_window, text="Guardar cambios", command=guardar_datos)
-    save_button.grid(row=6, column=0, columnspan=2, pady=10)  # Usar grid en lugar de pack para asegurar posición
-
-    edit_window.mainloop()
-
-    # Crear el botón de guardar cambios
-    save_button = tk.Button(edit_window, text="Guardar cambios", command=guardar_datos)
-    save_button.grid(row=5, column=0, columnspan=2, pady=10)  # Usar grid en lugar de pack para asegurar posición
-
-    edit_window.mainloop()
-
-
-    # Crear el botón de guardar cambios
-    save_button = tk.Button(edit_window, text="Guardar cambios", command=guardar_datos)
-    save_button.grid(row=5, column=0, columnspan=2, pady=10)  # Usar grid en lugar de pack para asegurar posición
-
-    edit_window.mainloop()
-
 
 # Función para buscar tareas
 def search_tasks():
@@ -363,6 +377,7 @@ root.title("Gestor de Tareas")
 root.geometry("1200x700")
 root.iconbitmap("gatito.ico")
 root.configure(bg="#EAEDED")
+
 
 # Cambiar la fuente por defecto
 root.option_add("*Font", "Arial 10")
@@ -401,9 +416,19 @@ tk.Label(entry_frame, text="Descripción:").grid(row=1, column=0, padx=10, pady=
 desc_entry = tk.Text(entry_frame, width=30, height=5)
 desc_entry.grid(row=1, column=1, padx=10, pady=10, sticky="ew")  # Expande horizontalmente
 
-tk.Label(entry_frame, text="Fecha de vencimiento:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
-cal = Calendar(entry_frame, selectmode="day", date_pattern="yyyy-mm-dd")
-cal.grid(row=2, column=1, padx=10, pady=10, sticky="ew")  # Expande horizontalmente
+# Spinbox para las horas (1-12)
+hour_var = tk.StringVar(value="12")
+hour_spinbox = tk.Spinbox(entry_frame, from_=1, to=12, wrap=True, textvariable=hour_var, width=5, state="readonly")
+hour_spinbox.grid(row=2, column=2, padx=10, pady=10, sticky="w")
+# Spinbox para los minutos (00-59)
+minute_var = tk.StringVar(value="00")
+minute_spinbox = tk.Spinbox(entry_frame, from_=0, to=59, wrap=True, textvariable=minute_var, width=5, state="readonly", format="%02.0f")
+minute_spinbox.grid(row=2, column=3, pady=12, padx=12, sticky="w")
+
+# Spinbox para AM/PM
+am_pm_var = tk.StringVar(value="AM")
+am_pm_spinbox = tk.Spinbox(entry_frame, values=("AM", "PM"), wrap=True, textvariable=am_pm_var, width=5, state="readonly")
+am_pm_spinbox.grid(row=2, column=4, pady=14, padx=14, sticky="w")
 
 tk.Label(entry_frame, text="Categoría:").grid(row=3, column=0, padx=10, pady=10, sticky="w")
 category_var = tk.StringVar()
@@ -416,10 +441,9 @@ priority_menu = ttk.Combobox(entry_frame, textvariable=priority_var, values=["Al
 priority_menu.grid(row=4, column=1, padx=10, pady=10, sticky="ew")  # Expande horizontalmente
 
 # En la sección de entradas, donde se selecciona la fecha de vencimiento, agrega un campo para la hora
-tk.Label(entry_frame, text="Hora de vencimiento:").grid(row=2, column=2, padx=10, pady=10, sticky="w")
-time_entry = tk.Entry(entry_frame, width=15)  # Campo para hora en formato HH:MM
-time_entry.grid(row=2, column=3, padx=10, pady=10, sticky="ew")
-
+tk.Label(entry_frame, text="Hora de vencimiento:")
+cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
+cal.pack(padx=12, pady=12, anchor="w")
 
 # Configuración del frame de botones
 button_frame = tk.Frame(entry_frame, bg="#EAEDED")
