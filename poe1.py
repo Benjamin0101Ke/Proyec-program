@@ -22,7 +22,6 @@ def seleccionar_ubicacion():
     db_path = os.path.join(db_directory, "tasks.db")
     conectar_db()  # Conectar o crear la base de datos
 
-
 def conectar_db():
 
     global conn, cursor
@@ -61,35 +60,49 @@ else:
     # Asegurarse de que la fecha esté en el formato correcto
 
 
-def obtener_hora_seleccionada():
-            hora_seleccionada = f"{hour_var.get()}:{minute_var.get()}"
-            print(f"Hora seleccionada: {hora_seleccionada}")
-            return hora_seleccionada
+def calculo_de_fechas(due_date):
+    """
+    Calcula el tiempo restante hasta una fecha de vencimiento.
+    """
+    try:
+        # Intentar convertir la fecha de vencimiento al formato correcto
+        due_datetime = datetime.strptime(due_date, "%Y-%m-%d %H:%M")
+    except ValueError:
+        # Si hay un error en el formato, devolver "Formato inválido"
+        return "Formato inválido"
+    
+    actualidad = datetime.now()
+    remaining_time = due_datetime - actualidad
+
+    if remaining_time.total_seconds() < 0:
+        return "Vencido"
+    else:
+        dias = remaining_time.days
+        horas, remainder = divmod(remaining_time.seconds, 3600)
+        minutos, _ = divmod(remainder, 60)
+        return f"{dias} días, {horas} horas, {minutos} minutos"
+
+
 
 def agregar_tarea():
 
+    hora = hour_var.get()
+    minuto = minute_var.get()
+    fecha_de_calendario = cal.get_date()  
+
     title = title_entry.get()
     description = desc_entry.get("1.0", tk.END)
-    due_date = cal.get_date()
-    due_time = obtener_hora_seleccionada
+    due_date = f"{fecha_de_calendario} {hora.zfill(2)}:{minuto.zfill(2)}"
     category = category_var.get()
     priority = priority_var.get()
 
-    if title == "" or due_time == "":  # Validación de que no estén vacíos
+    if title == "" or due_date == "":  # Validación de que no estén vacíos
         messagebox.showwarning("Advertencia", "El título y la hora no pueden estar vacíos.")
         return
 
-    hora = hour_var.get()
-    minuto = minute_var.get()
-
-
-
-    # Combinar fecha y hora
-    due_datetime = f"{due_date} {hora}:{minuto}:00"  
-
     # Insertar tarea en la base de datos
     cursor.execute("INSERT INTO tasks (title, description, due_date, category, priority) VALUES (?, ?, ?, ?, ?) ",
-                   (title, description.strip(), due_datetime, category, priority))
+                   (title, description.strip(), due_date, category, priority))
     conn.commit()
 
     Recargar_tareas()
@@ -97,64 +110,48 @@ def agregar_tarea():
     # Limpiar campos de entrada
     title_entry.delete(0, tk.END)
     desc_entry.delete("1.0", tk.END) 
+    hour_spinbox.delete()
+    minute_spinbox.delete()
+
 
     # Última tarea agregada
     ultima_tarea = task_tree.get_children()[-1]
     task_tree.selection_set(ultima_tarea)
  
-def calculo_de_fechas(due_datetime_str):
-    try:
-        # Intentamos convertir la fecha y hora proporcionada al formato correcto
-        due_datetime = datetime.strptime(due_datetime_str, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        return "Fecha o hora no válida"
-    
-    # Obtener la fecha y hora actuales
-    current_datetime = datetime.now()
+ 
 
-    # Calcular el tiempo restante entre la fecha de vencimiento y la actual
-    remaining_time = due_datetime - current_datetime
-
-    # Si el tiempo restante es negativo, significa que ya está vencido
-    if remaining_time.total_seconds() < 0:
-        return remaining_time
-    else:
-        # De lo contrario, mostramos el tiempo restante
-        days = remaining_time.days
-        hours, remainder = divmod(remaining_time.seconds, 3600)
-        minutes, _ = divmod(remainder, 60)
-        
-        # Devolver el tiempo restante en un formato legible
-        return f"{days} días, {hours} horas, {minutes} minutos"
-
-
-# Función para cargar tareas desde la base de datos
-def Recargar_tareas(search_query=""):
+# Función para cargar tareas desde la base de datos con búsqueda por título y prioridad
+def Recargar_tareas(search_query="", priority_filter=""):
     # Limpiar cualquier tarea previa en la vista
     for row in task_tree.get_children():
         task_tree.delete(row)
     
     # Consultar tareas con el filtro de búsqueda
     query = "SELECT * FROM tasks WHERE title LIKE ?"
-    cursor.execute(query, ('%' + search_query + '%',))
+    params = ('%' + search_query + '%',)
 
+    # Si se seleccionó una prioridad, agregar al filtro
+    if priority_filter:
+        query += " AND priority = ?"
+        params += (priority_filter,)
+
+    cursor.execute(query, params)
     tasks = cursor.fetchall()
 
-    if tasks: 
+    if tasks:  
         for task in tasks:
             remaining_time = calculo_de_fechas(task[3])
             task_id, title, description, due_date, category, priority = task
-            tags = []  # Establecer etiquetas para cambiar el color si es necesario
+            tags = []  
             if remaining_time == "Vencido":
-                tags.append("vencido")  # Etiqueta de tarea vencida
+                tags.append("vencido") 
             task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
-            
     else:
         pass
 
     root.after(60000, Recargar_tareas)  # Actualizar la vista cada minuto
 
-    
+
     for row in task_tree.get_children():
         task_tree.delete(row)
     
@@ -229,21 +226,6 @@ def Recargar_tareas(search_query=""):
         task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
     root.after(60000, Recargar_tareas)  
 
-# Función para eliminar una tarea y reiniciar el ID
-    selected_item = task_tree.selection()
-    if not selected_item:
-        return
-
-    task_id = task_tree.item(selected_item, "values")[0]
-
-
-    confirm = messagebox.askyesno("Confirmación", "¿Estás seguro de que quieres eliminar esta tarea?")
-    if confirm:
-        
-        cursor.execute("DELETE FROM tasks WHERE id=?", (task_id,))
-        conn.commit()  
-
-        Recargar_tareas()
 
 def eliminar_tarea():
     selected_item = task_tree.selection()  
@@ -258,8 +240,6 @@ def eliminar_tarea():
             conn.commit()
 
             Recargar_tareas()
-
-
 
 # Función para editar una tarea
 def editar_tarea():
@@ -294,11 +274,11 @@ def editar_tarea():
     tk.Label(edit_window, text="Hora de vencimiento:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     hour_var = tk.StringVar(value="12")
     hour_spinbox = tk.Spinbox(edit_window, from_=0, to=23, wrap=True, textvariable=hour_var, width=5, state="readonly")
-    hour_spinbox.grid(row=3, column=0, padx=0, pady=0)
+    hour_spinbox.grid(row=3, column=1, padx=0, pady=10, sticky="w")
 
     minute_var = tk.StringVar(value="00")
     minute_spinbox = tk.Spinbox(edit_window, from_=0, to=59, wrap=True, textvariable=minute_var, width=5, state="readonly", format="%02.0f")
-    minute_spinbox.grid(row=3, column=1, padx=2, pady=2)
+    minute_spinbox.grid(row=3, column=2, padx=2, pady=10, sticky="w")
 
     # Categoría
     tk.Label(edit_window, text="Categoría:").grid(row=4, column=0, padx=10, pady=10, sticky="w")
@@ -340,11 +320,30 @@ def editar_tarea():
     save_button.grid(row=6, column=0, columnspan=2, pady=0)
 
     edit_window.mainloop()
-# Función para buscar tareas
 def search_tasks():
     search_query = search_entry.get()
-    Recargar_tareas(search_query)
+    priority_filter = priority_combobox.get()  # Obtener la prioridad seleccionada
+    Recargar_tareas(search_query, priority_filter)
 
+
+    task_tree.delete(*task_tree.get_children())  # Eliminar todas las filas del árbol
+
+    # Consulta SQL para buscar tareas
+    if search_query and priority_filter:
+        cursor.execute("SELECT id, title, description, due_date, category, priority FROM tasks WHERE title LIKE ? AND priority = ?", (f"%{search_query}%", priority_filter))
+    elif search_query:
+        cursor.execute("SELECT id, title, description, due_date, category, priority FROM tasks WHERE title LIKE ?", (f"%{search_query}%",))
+    elif priority_filter:
+        cursor.execute("SELECT id, title, description, due_date, category, priority FROM tasks WHERE priority = ?", (priority_filter,))
+    else:
+        cursor.execute("SELECT id, title, description, due_date, category, priority FROM tasks")
+
+    tasks = cursor.fetchall()
+
+    for task in tasks:
+        task_id, title, description, due_date, category, priority = task
+        remaining_time = calculo_de_fechas(due_date)
+        task_tree.insert("", "end", values=(task_id, title, description, due_date, category, priority, remaining_time))
 # Cerrar la conexión al cerrar la ventana
 def on_close():
     conn.close()
@@ -418,7 +417,7 @@ priority_menu.grid(row=4, column=1, padx=10, pady=10, sticky="ew")  # Expande ho
 # En la sección de entradas, donde se selecciona la fecha de vencimiento, agrega un campo para la hora
 tk.Label(entry_frame, text="Hora de vencimiento:")
 cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
-cal.pack(padx=12, pady=12, anchor="w")
+cal.pack(padx=10, pady=10, anchor="w")
 
 # Configuración del frame de botones
 button_frame = tk.Frame(entry_frame, bg="#FAEBD7")
@@ -440,6 +439,10 @@ task_frame.pack(side="right", padx=20, pady=20, fill="both", expand=True)
 tk.Label(task_frame, text="Buscar tareas:").pack(padx=10, pady=10)
 search_entry = tk.Entry(task_frame, width=50)
 search_entry.pack(padx=10, pady=10, fill="x")  # Ajusta el campo de búsqueda al ancho
+# Añadir el Combobox para seleccionar la prioridad en el área de búsqueda
+tk.Label(task_frame, text="Buscar por prioridad:").pack(padx=10, pady=10)
+priority_combobox = ttk.Combobox(task_frame, values=["", "Alta", "Media", "Baja"], state="readonly")
+priority_combobox.pack(padx=10, pady=10, fill="x")  # Ajusta el Combobox al ancho
 
 search_button = tk.Button(task_frame, text="Buscar", command=search_tasks)
 search_button.pack(padx=10, pady=10)
