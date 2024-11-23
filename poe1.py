@@ -152,81 +152,6 @@ def Recargar_tareas(search_query="", priority_filter=""):
     root.after(60000, Recargar_tareas)  # Actualizar la vista cada minuto
 
 
-    for row in task_tree.get_children():
-        task_tree.delete(row)
-    
-    
-    query = "SELECT * FROM tasks WHERE title LIKE ?"
-    cursor.execute(query, ('%' + search_query + '%',))
-
-    tasks = cursor.fetchall()
-
-    if tasks:  
-        for task in tasks:
-            remaining_time = calculo_de_fechas(task[3])
-            task_id, title, description, due_date, category, priority = task
-            tags = []  
-            if remaining_time == "Vencido":
-                tags.append("vencido") 
-            task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
-    else:
-       
-        pass
-
-    root.after(60000, Recargar_tareas)  
-    
-    
-
-    for row in task_tree.get_children():
-        task_tree.delete(row)  # Eliminar todas las filas existentes en el árbol
-
-    query = "SELECT * FROM tasks WHERE title LIKE ?"
-    cursor.execute(query, ('%' + search_query + '%',))
-
-    tasks = cursor.fetchall()  
-
-
-    
-    print("Tareas cargadas:")
-    for task in tasks:
-        print(task)  
-
-    for task in tasks:
-        remaining_time = calculo_de_fechas(task[3])
-        task_id, title, description, due_date, category, priority = task
-        tags = [] 
-        if remaining_time == "Vencido":
-            tags.append("vencido") 
-        task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
-
-    for row in task_tree.get_children():
-        task_tree.delete(row)  
-
-    query = "SELECT * FROM tasks WHERE title LIKE ?"
-    cursor.execute(query, ('%' + search_query + '%',))
-
-    for task in cursor.fetchall():
-        remaining_time = calculo_de_fechas(task[3])
-        task_id, title, description, due_date, category, priority = task
-        tags = []  
-        if remaining_time == "Vencido":
-            tags.append("vencido")  
-        task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
-
-    for row in task_tree.get_children():
-        task_tree.delete(row)
-    query = "SELECT * FROM tasks WHERE title LIKE ?"
-    cursor.execute(query, ('%' + search_query + '%',))
-    for task in cursor.fetchall():
-        remaining_time = calculo_de_fechas(task[3])
-        task_id, title, description, due_date, category, priority = task
-        tags = [] 
-        if remaining_time == "Vencido":
-            tags.append("vencido")  
-        task_tree.insert("", tk.END, values=(task_id, title, description, due_date, category, priority, remaining_time), tags=tags)
-    root.after(60000, Recargar_tareas)  
-
-
 def eliminar_tarea():
     selected_item = task_tree.selection()  
     if selected_item:  
@@ -320,6 +245,7 @@ def editar_tarea():
     save_button.grid(row=6, column=0, columnspan=2, pady=0)
 
     edit_window.mainloop()
+    
 def search_tasks():
     search_query = search_entry.get()
     priority_filter = priority_combobox.get()  # Obtener la prioridad seleccionada
@@ -378,11 +304,11 @@ main_menu.add_command(label="Salir", command=root.quit)
 
 # Frame principal
 # Configuración del marco principal
-main_frame = tk.Frame(root, bg="#EAEDED", bd=2, relief="solid")
+main_frame = tk.Frame(root, bg="#835581", bd=2, relief="solid")
 main_frame.pack(pady=20, fill="both", expand=True)
 
 # Configuración del frame para entradas (lado izquierdo)
-entry_frame = tk.Frame(main_frame, bg="#EAEDED", bd=2, relief="solid")
+entry_frame = tk.Frame(main_frame, bg="#8E6189", bd=2, relief="solid")
 entry_frame.pack(side="left", padx=20, pady=20, fill="y", expand=True)
 
 # Configuración de las entradas
@@ -415,13 +341,13 @@ priority_menu = ttk.Combobox(entry_frame, textvariable=priority_var, values=["Al
 priority_menu.grid(row=4, column=1, padx=10, pady=10, sticky="ew")  # Expande horizontalmente
 
 # En la sección de entradas, donde se selecciona la fecha de vencimiento, agrega un campo para la hora
-tk.Label(entry_frame, text="Hora de vencimiento:")
-cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
-cal.pack(padx=10, pady=10, anchor="w")
+tk.Label(entry_frame, text="Hora de vencimiento:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
+cal = Calendar(entry_frame, selectmode="day", date_pattern="y-mm-dd")
+cal.grid(row=5, column=0, columnspan=2, pady=10, sticky="ew")
 
 # Configuración del frame de botones
 button_frame = tk.Frame(entry_frame, bg="#FAEBD7")
-button_frame.grid(row=5, column=0, columnspan=2, pady=10, sticky="ew")  
+button_frame.grid(row=6, column=0, columnspan=2, pady=10, sticky="ew")  
 add_button = tk.Button(button_frame, text="Añadir tarea", command=agregar_tarea)
 add_button.pack(side="left", padx=5, fill="x", expand=True)
 
@@ -432,7 +358,7 @@ delete_button = tk.Button(button_frame, text="Eliminar tarea", command=eliminar_
 delete_button.pack(side="left", padx=5, fill="x", expand=True)
 
 # Configuración del frame de tareas (lado derecho)
-task_frame = tk.Frame(main_frame, bg="#EAEDED", bd=2, relief="solid")
+task_frame = tk.Frame(main_frame, bg="#EBE1D9", bd=2, relief="flat")
 task_frame.pack(side="right", padx=20, pady=20, fill="both", expand=True)
 
 # Configuración de la búsqueda
