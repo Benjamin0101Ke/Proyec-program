@@ -4,7 +4,6 @@ from tkcalendar import Calendar
 import sqlite3
 import os
 from datetime import datetime
-import time
 
 
 db_path = "" 
@@ -82,11 +81,11 @@ def agregar_tarea():
 
     hora = hour_var.get()
     minuto = minute_var.get()
-    formato = am_pm_var.get()
+
 
 
     # Combinar fecha y hora
-    due_datetime = f"{due_date} {hora}:{minuto}:00 {formato}"  # Agregar los segundos por defecto
+    due_datetime = f"{due_date} {hora}:{minuto}:00"  
 
     # Insertar tarea en la base de datos
     cursor.execute("INSERT INTO tasks (title, description, due_date, category, priority) VALUES (?, ?, ?, ?, ?) ",
@@ -97,8 +96,7 @@ def agregar_tarea():
 
     # Limpiar campos de entrada
     title_entry.delete(0, tk.END)
-    desc_entry.delete("1.0", tk.END)
-    hour_var.delete(0, tk.END)  
+    desc_entry.delete("1.0", tk.END) 
 
     # Última tarea agregada
     ultima_tarea = task_tree.get_children()[-1]
@@ -107,19 +105,19 @@ def agregar_tarea():
 def calculo_de_fechas(due_datetime_str):
     try:
         # Intentamos convertir la fecha y hora proporcionada al formato correcto
-        due_datetime = datetime.strptime(due_datetime_str, "%Y-%m-%d %I:%M-%p")  # %I para formato de 12 horas (AM/PM)
+        due_datetime = datetime.strptime(due_datetime_str, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return "Fecha o hora no válida"
-
+    
     # Obtener la fecha y hora actuales
-    hoy = datetime.now()
+    current_datetime = datetime.now()
 
     # Calcular el tiempo restante entre la fecha de vencimiento y la actual
-    remaining_time = due_datetime - hoy
+    remaining_time = due_datetime - current_datetime
 
     # Si el tiempo restante es negativo, significa que ya está vencido
     if remaining_time.total_seconds() < 0:
-        return "La fecha ya venció"
+        return remaining_time
     else:
         # De lo contrario, mostramos el tiempo restante
         days = remaining_time.days
@@ -129,13 +127,6 @@ def calculo_de_fechas(due_datetime_str):
         # Devolver el tiempo restante en un formato legible
         return f"{days} días, {hours} horas, {minutes} minutos"
 
-
-# Función para actualizar cada minuto
-def actualizar_tiempo_restante(due_datetime_str):
-    while True:
-        tiempo_restante = calculo_de_fechas(due_datetime_str)
-        print(f"Tiempo restante: {tiempo_restante}")
-        time.sleep(60)
 
 # Función para cargar tareas desde la base de datos
 def Recargar_tareas(search_query=""):
@@ -270,18 +261,21 @@ def eliminar_tarea():
 
 
 
+# Función para editar una tarea
 def editar_tarea():
     selected_item = task_tree.selection()
     if not selected_item:
+        messagebox.showwarning("Advertencia", "Por favor, selecciona una tarea para editar.")
         return
 
     # Obtener los valores de la tarea seleccionada
-    task_id, title, description, due_date, category, priority, _ = task_tree.item(selected_item, "values")
+    task_values = task_tree.item(selected_item, "values")
+    task_id, title, description, due_date, category, priority, _ = task_values
 
-    # Crear cuadro de diálogo para editar la tarea
+    # Crear la ventana de edición
     edit_window = tk.Toplevel(root)
     edit_window.title("Editar Tarea")
-    edit_window.geometry("400x450")
+    edit_window.geometry("400x500")
 
     # Título de la tarea
     tk.Label(edit_window, text="Título:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -295,77 +289,57 @@ def editar_tarea():
     desc_entry_edit.grid(row=1, column=1, padx=10, pady=10)
     desc_entry_edit.insert("1.0", description)
 
+
+    # Hora de vencimiento
+    tk.Label(edit_window, text="Hora de vencimiento:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
     hour_var = tk.StringVar(value="12")
-    hour_spinbox = tk.Spinbox(edit_window, from_=1, to=24, wrap=True, textvariable=hour_var, width=5, state="readonly")
-    hour_spinbox.grid(row=2, column=2, padx=10, pady=10, sticky="w")
-    # Spinbox para los minutos (00-59)
+    hour_spinbox = tk.Spinbox(edit_window, from_=0, to=23, wrap=True, textvariable=hour_var, width=5, state="readonly")
+    hour_spinbox.grid(row=3, column=0, padx=0, pady=0)
+
     minute_var = tk.StringVar(value="00")
     minute_spinbox = tk.Spinbox(edit_window, from_=0, to=59, wrap=True, textvariable=minute_var, width=5, state="readonly", format="%02.0f")
-    minute_spinbox.grid(row=2, column=3, pady=12, padx=12, sticky="w")
-
-    # Si la tarea ya tiene una fecha y hora, establecerlos en el calendario y selector de hora
-    if due_date:
-        try:
-            due_datetime = datetime.strptime(due_date, "%Y-%m-%d %H:%M:%S")
-            cal.selection_set(due_datetime.date())  # Establecer solo la fecha
-            obtener_hora_seleccionada.set(due_datetime.strftime("%H:%M"))  # Establecer la hora
-        except ValueError:
-            pass
+    minute_spinbox.grid(row=3, column=1, padx=2, pady=2)
 
     # Categoría
     tk.Label(edit_window, text="Categoría:").grid(row=4, column=0, padx=10, pady=10, sticky="w")
-    category_var_edit = tk.StringVar()
-    category_menu_edit = ttk.Combobox(edit_window, textvariable=category_var_edit, values=["Ejercicio", "Comida", "Actividad"], state="readonly")
-    category_menu_edit.grid(row=4, column=1, padx=10, pady=10)
-    category_var_edit.set(category)
+    category_var = tk.StringVar(value=category)
+    category_menu = ttk.Combobox(edit_window, textvariable=category_var, values=["Ejercicio", "Comida", "Actividad"], state="readonly")
+    category_menu.grid(row=4, column=1)
 
     # Prioridad
     tk.Label(edit_window, text="Prioridad:").grid(row=5, column=0, padx=10, pady=10, sticky="w")
-    priority_var_edit = tk.StringVar()
-    priority_menu_edit = ttk.Combobox(edit_window, textvariable=priority_var_edit, values=["Alta", "Media", "Baja"], state="readonly")
-    priority_menu_edit.grid(row=5, column=1, padx=10, pady=10)
+    priority_var = tk.StringVar(value=priority)
+    priority_menu = ttk.Combobox(edit_window, textvariable=priority_var, values=["Alta", "Media", "Baja"], state="readonly")
+    priority_menu.grid(row=5, column=1, padx=10, pady=10)
 
-    tk.Label(entry_frame, text="Hora de vencimiento:")
-    cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
-    cal.pack(padx=12, pady=12, anchor="w")
-
-    # Función para guardar los cambios
+    # Función para guardar los datos actualizados
     def guardar_datos():
         new_title = title_entry_edit.get()
         new_description = desc_entry_edit.get("1.0", tk.END).strip()
-        new_due_date = cal.get_date()  
-        hora_seleccionda = obtener_hora_seleccionada()
-        new_category = category_var_edit.get()
-        new_priority = priority_var_edit.get()
+        new_due_date = cal.get_date()
+        new_hour = hour_var.get()
+        new_minute = minute_var.get()
+        new_category = category_var.get()
+        new_priority = priority_var.get()
 
-        # Combinar la fecha y la hora
-        new_due_datetime_str = f"{new_due_date} {hora_seleccionda}:00"
+        # Validar formato de fecha y hora
         try:
-            new_due_datetime = datetime.strptime(new_due_datetime_str, "%Y-%m-%d %H:%M:%S")
+            due_datetime = f"{new_due_date} {new_hour}:{new_minute}:00"
+            datetime.strptime(due_datetime, "%Y-%m-%d %H:%M:%S")  # Verifica el formato
         except ValueError:
-            messagebox.showwarning("Advertencia", "La fecha o la hora no son válidas.")
+            messagebox.showerror("Error", "La fecha y hora ingresadas no son válidas.")
             return
 
-        # Validación de que el título no esté vacío
-        if new_title == "":
-            messagebox.showwarning("Advertencia", "El título no puede estar vacío.")
-            return
+        # Actualizar los datos en la tabla
+        task_tree.item(selected_item, values=(task_id, new_title, new_description, new_due_date, new_category, new_priority, due_datetime))
+        messagebox.showinfo("Éxito", "Tarea actualizada correctamente.")
+        edit_window.destroy()
 
-        # Actualización de la tarea en la base de datos
-        cursor.execute("UPDATE tasks SET title=?, description=?, due_date=?, category=?, priority=? WHERE id=?",
-                       (new_title, new_description, new_due_datetime, new_category, new_priority, task_id))
-        conn.commit()  # Guardar cambios en la base de datos
-
-        Recargar_tareas()  # Recargar la lista de tareas para reflejar los cambios
-        edit_window.destroy()  # Cerrar la ventana de edición
-
-    # Crear el botón de guardar cambios
+    # Botón para guardar cambios
     save_button = tk.Button(edit_window, text="Guardar cambios", command=guardar_datos)
-    save_button.grid(row=6, column=0, columnspan=2, pady=10)  # Usar grid en lugar de pack para asegurar posición
+    save_button.grid(row=6, column=0, columnspan=2, pady=0)
 
     edit_window.mainloop()
-
-
 # Función para buscar tareas
 def search_tasks():
     search_query = search_entry.get()
@@ -405,7 +379,7 @@ main_menu.add_command(label="Salir", command=root.quit)
 
 # Frame principal
 # Configuración del marco principal
-main_frame = tk.Frame(root, bg="#FAEBD7", bd=2, relief="solid")
+main_frame = tk.Frame(root, bg="#EAEDED", bd=2, relief="solid")
 main_frame.pack(pady=20, fill="both", expand=True)
 
 # Configuración del frame para entradas (lado izquierdo)
@@ -423,17 +397,13 @@ desc_entry.grid(row=1, column=1, padx=10, pady=10, sticky="ew")  # Expande horiz
 
 # Spinbox para las horas (1-12)
 hour_var = tk.StringVar(value="12")
-hour_spinbox = tk.Spinbox(entry_frame, from_=1, to=12, wrap=True, textvariable=hour_var, width=5, state="readonly")
+hour_spinbox = tk.Spinbox(entry_frame, from_=1, to=24, wrap=True, textvariable=hour_var, width=5, state="readonly")
 hour_spinbox.grid(row=2, column=2, padx=10, pady=10, sticky="w")
 # Spinbox para los minutos (00-59)
 minute_var = tk.StringVar(value="00")
 minute_spinbox = tk.Spinbox(entry_frame, from_=0, to=59, wrap=True, textvariable=minute_var, width=5, state="readonly", format="%02.0f")
 minute_spinbox.grid(row=2, column=3, pady=12, padx=12, sticky="w")
 
-# Spinbox para AM/PM
-am_pm_var = tk.StringVar(value="AM")
-am_pm_spinbox = tk.Spinbox(entry_frame, values=("AM", "PM"), wrap=True, textvariable=am_pm_var, width=5, state="readonly")
-am_pm_spinbox.grid(row=2, column=4, pady=14, padx=14, sticky="w")
 
 tk.Label(entry_frame, text="Categoría:").grid(row=3, column=0, padx=10, pady=10, sticky="w")
 category_var = tk.StringVar()
@@ -451,7 +421,7 @@ cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
 cal.pack(padx=12, pady=12, anchor="w")
 
 # Configuración del frame de botones
-button_frame = tk.Frame(entry_frame, bg="#EAEDED")
+button_frame = tk.Frame(entry_frame, bg="#FAEBD7")
 button_frame.grid(row=5, column=0, columnspan=2, pady=10, sticky="ew")  
 add_button = tk.Button(button_frame, text="Añadir tarea", command=agregar_tarea)
 add_button.pack(side="left", padx=5, fill="x", expand=True)
@@ -484,9 +454,6 @@ task_tree.heading("Categoría", text="Categoría")
 task_tree.heading("Prioridad", text="Prioridad")
 task_tree.heading("Tiempo restante", text="Tiempo restante")
 task_tree.heading("Fecha de vencimiento", text="Fecha y hora de vencimiento")
-
-# Al mostrar las tareas
-
 
 # Configuración para que el árbol se ajuste al tamaño
 task_tree.pack(fill="both", expand=True)
