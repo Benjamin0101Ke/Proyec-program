@@ -1,15 +1,15 @@
-import tkinter as tk
-from tkinter import ttk, messagebox,filedialog
-from tkcalendar import Calendar
-import sqlite3
+import tkinter as tk # sirve para crear la ventana
+from tkinter import ttk, messagebox,filedialog # sirve para crear la ventana y los botones
+from tkcalendar import Calendar # sirve para crear el calendario
+import sqlite3 #sirve para crear la base de datos
 import os
-from datetime import datetime
+from datetime import datetime # sirve para el tiempo
 
 
-db_path = "" 
+db_path = ""  # sirve para guardar la ubicación de la base de datos
 
 
-def seleccionar_ubicacion():
+def seleccionar_ubicacion(): #
     """
     Permite al usuario seleccionar una ubicación para guardar la base de datos.
     """
@@ -111,8 +111,7 @@ def agregar_tarea():
     # Limpiar campos de entrada
     title_entry.delete(0, tk.END)
     desc_entry.delete("1.0", tk.END) 
-    hour_spinbox.delete()
-    minute_spinbox.delete()
+   
 
 
     # Última tarea agregada
@@ -379,11 +378,11 @@ main_menu.add_command(label="Salir", command=root.quit)
 
 # Frame principal
 # Configuración del marco principal
-main_frame = tk.Frame(root, bg="#387361", bd=2, relief="solid")
+main_frame = tk.Frame(root, bg="#EAEDED", bd=2, relief="solid")
 main_frame.pack(pady=20, fill="both", expand=True)
 
 # Configuración del frame para entradas (lado izquierdo)
-entry_frame = tk.Frame(main_frame, bg="#59B698", bd=2, relief="solid")
+entry_frame = tk.Frame(main_frame, bg="#EAEDED", bd=2, relief="solid")
 entry_frame.pack(side="left", padx=20, pady=20, fill="y", expand=True)
 
 # Configuración de las entradas
@@ -416,12 +415,12 @@ priority_menu = ttk.Combobox(entry_frame, textvariable=priority_var, values=["Al
 priority_menu.grid(row=4, column=1, padx=10, pady=10, sticky="ew")  # Expande horizontalmente
 
 # En la sección de entradas, donde se selecciona la fecha de vencimiento, agrega un campo para la hora
-tk.Label(entry_frame, text="Hora de vencimiento:", bg="#71E9C3").grid(row=5, column=0, padx=10, pady=10, sticky="ew")
+tk.Label(entry_frame, text="Hora de vencimiento:")
 cal = Calendar(root, selectmode="day", date_pattern="y-mm-dd")
 cal.pack(padx=10, pady=10, anchor="w")
 
 # Configuración del frame de botones
-button_frame = tk.Frame(entry_frame)
+button_frame = tk.Frame(entry_frame, bg="#FAEBD7")
 button_frame.grid(row=5, column=0, columnspan=2, pady=10, sticky="ew")  
 add_button = tk.Button(button_frame, text="Añadir tarea", command=agregar_tarea)
 add_button.pack(side="left", padx=5, fill="x", expand=True)
@@ -433,7 +432,7 @@ delete_button = tk.Button(button_frame, text="Eliminar tarea", command=eliminar_
 delete_button.pack(side="left", padx=5, fill="x", expand=True)
 
 # Configuración del frame de tareas (lado derecho)
-task_frame = tk.Frame(main_frame, bg="#6AD9B6", bd=2, relief="solid")
+task_frame = tk.Frame(main_frame, bg="#EAEDED", bd=2, relief="solid")
 task_frame.pack(side="right", padx=20, pady=20, fill="both", expand=True)
 
 # Configuración de la búsqueda
